@@ -1,12 +1,19 @@
-# ExolveNet
+<div align="center">
+  <img src="https://raw.githubusercontent.com/ai-iskuzhin/ExolveNet/main/assets/ExolveNet.png" width="140" alt="Логотип ExolveNet" />
 
-Неофициальный .NET SDK для платформы **МТС Exolve**. В текущей версии закрыт **Number Lookup
-(HLR) API** — проверка номера: активность, статус SIM, оператор и регион, давность активности,
-удачное время для контакта.
+  <h1>ExolveNet</h1>
+
+  <p>
+    <a href="https://www.nuget.org/packages/ExolveNet"><img src="https://img.shields.io/nuget/v/ExolveNet?logo=nuget&amp;style=flat-square" alt="Версия NuGet" /></a>
+    <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net8.0%20%7C%20net10.0-512BD4?logo=dotnet&amp;style=flat-square" alt="Таргеты" /></a>
+    <a href="https://github.com/ai-iskuzhin/ExolveNet/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ai-iskuzhin/ExolveNet?style=flat-square" alt="Лицензия" /></a>
+    <a href="https://github.com/ai-iskuzhin/ExolveNet/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ai-iskuzhin/ExolveNet/ci.yml?branch=main&amp;style=flat-square" alt="CI" /></a>
+  </p>
+</div>
+
+Неофициальный .NET SDK для платформы **МТС Exolve**.
 
 Не аффилирован с МТС Exolve и АО «МТТ».
-
-[![NuGet](https://img.shields.io/nuget/v/ExolveNet.svg)](https://www.nuget.org/packages/ExolveNet/)
 
 ## Установка
 
@@ -27,8 +34,14 @@ dotnet add package ExolveNet
 | Время для звонка | `GetBestCallTimeAsync` | `POST hlr/v1/GetBestCallTime` | **да** |
 | Время для SMS | `GetBestSmsTimeAsync` | `POST hlr/v1/GetBestSmsTime` | **да** |
 
-Пакетные отчёты (`GenerateActivityScoreReport`, `GetHLRReport` и остальные — до 50 000 номеров за
-раз) пока не реализованы.
+### Пакетные отчёты — до 50 000 номеров за раз
+
+| Метод Exolve | API клиента | HTTP |
+| --- | --- | --- |
+| Отчёт по активности | `GenerateActivityScoreReportAsync` | `POST hlr/v1/GenerateActivityScoreReport` |
+| Отчёт по времени звонка | `GenerateBestCallTimeReportAsync` | `POST hlr/v1/GenerateBestCallTimeReport` |
+| Забрать отчёт | `GetReportAsync` | `POST hlr/v1/GetHLRReport` |
+| Список отчётов за период | `ListReportsAsync` | `POST hlr/v1/GetHLRListReport` |
 
 Полное описание полей — в [docs/api-hlr.md](docs/api-hlr.md).
 
@@ -78,6 +91,31 @@ catch (ExolveApiException ex) when (ex.IsNonMtsNumber)
     // 400 enter another number — номер не МТС. Ожидаемый исход, а не сбой.
 }
 ```
+
+### Пакетная проверка
+
+```csharp
+var handle = await client.GenerateActivityScoreReportAsync(new[]
+{
+    "+79139999999",
+    "89139999998",
+});
+
+// Считается асинхронно — Pending/Processing это нормальный ответ, а не ошибка.
+var report = await client.GetReportAsync(handle.FileUuid!);
+if (report.IsComplete)
+{
+    Console.WriteLine(report.NumberTotal);
+    Console.WriteLine(report.DecodeResults());
+}
+```
+
+Список номеров уходит не массивом JSON, а **файлом в base64** — SDK нормализует каждый номер и
+кодирует список сам. Предел — 50 000 номеров; и пустой список, и превышение предела, и один
+нерабочий номер отвергаются локально, **до** платного запроса.
+
+`report.RetainedUntil` — это срок хранения (30 дней), хотя на проводе поле называется
+`created_at`. После него статус становится `Expired`, а данные пропадают.
 
 ## Тарификация — важное
 

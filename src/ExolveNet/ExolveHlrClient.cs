@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using ExolveNet.Hlr;
 
@@ -104,11 +105,121 @@ public sealed class ExolveHlrClient
     public Task<BestTimeResult> GetBestSmsTimeAsync(string number, CancellationToken cancellationToken = default) =>
         SendAsync<BestTimeResult>("GetBestSmsTime", number, cancellationToken);
 
+    // ── пакетные отчёты ──────────────────────────────────────────────────────
+
+    /// <summary>Ставит в очередь отчёт по активности для списка номеров (до 50 000).</summary>
+    /// <param name="numbers">Номера; нормализуются и кодируются в base64 по правилам Exolve.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>Идентификатор отчёта для <see cref="GetReportAsync"/>.</returns>
+    /// <exception cref="ExolveValidationException">Если список пуст, велик или содержит нерабочий номер.</exception>
+    public Task<HlrReportHandle> GenerateActivityScoreReportAsync(
+        IEnumerable<string> numbers, CancellationToken cancellationToken = default) =>
+        PostAsync<HlrReportHandle>(
+            "GenerateActivityScoreReport",
+            new NumbersRequest(ExolveNumbers.EncodeNumberList(numbers)),
+            cancellationToken);
+
+    /// <summary>Ставит в очередь отчёт по удачному времени звонка для списка номеров (до 50 000).</summary>
+    /// <param name="numbers">Номера.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>Идентификатор отчёта для <see cref="GetReportAsync"/>.</returns>
+    public Task<HlrReportHandle> GenerateBestCallTimeReportAsync(
+        IEnumerable<string> numbers, CancellationToken cancellationToken = default) =>
+        PostAsync<HlrReportHandle>(
+            "GenerateBestCallTimeReport",
+            new NumbersRequest(ExolveNumbers.EncodeNumberList(numbers)),
+            cancellationToken);
+
+    /// <summary>
+    /// Ставит в очередь отчёт из уже подготовленного base64.
+    /// </summary>
+    /// <remarks>
+    /// Формат файла Exolve не документирует. <see cref="ExolveNumbers.EncodeNumberList"/>
+    /// разделяет номера переводом строки; если выяснится, что нужен другой формат, кодируйте
+    /// сами и передавайте сюда.
+    /// </remarks>
+    /// <param name="type">Какой отчёт считать.</param>
+    /// <param name="numbersBase64">Готовый base64 списка номеров.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>Идентификатор отчёта.</returns>
+    /// <exception cref="ExolveValidationException">Если base64 пуст или <paramref name="type"/> неизвестен.</exception>
+    public Task<HlrReportHandle> GenerateReportAsync(
+        HlrReportType type, string numbersBase64, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(numbersBase64))
+        {
+            throw new ExolveValidationException("numbersBase64 is required.");
+        }
+
+        var method = type switch
+        {
+            HlrReportType.ActivityScore => "GenerateActivityScoreReport",
+            HlrReportType.BestCallTime => "GenerateBestCallTimeReport",
+            _ => throw new ExolveValidationException($"No generator endpoint for report type {type}.")
+        };
+
+        return PostAsync<HlrReportHandle>(method, new NumbersRequest(numbersBase64), cancellationToken);
+    }
+
+    /// <summary>Забирает пакетный отчёт по его идентификатору.</summary>
+    /// <remarks>
+    /// Отчёт считается асинхронно: пока он не готов, приходит статус
+    /// <see cref="HlrReportStatus.Pending"/> или <see cref="HlrReportStatus.Processing"/> — это
+    /// нормальный ответ, а не ошибка. Готовность проверяется через
+    /// <see cref="HlrReport.IsComplete"/>.
+    /// </remarks>
+    /// <param name="fileUuid">Идентификатор, полученный при постановке отчёта.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>Отчёт и его состояние.</returns>
+    /// <exception cref="ExolveValidationException">Если идентификатор пуст.</exception>
+    public Task<HlrReport> GetReportAsync(string fileUuid, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(fileUuid))
+        {
+            throw new ExolveValidationException("fileUuid is required.");
+        }
+
+        return PostAsync<HlrReport>("GetHLRReport", new FileUuidRequest(fileUuid), cancellationToken);
+    }
+
+    /// <summary>Перечисляет пакетные отчёты за период.</summary>
+    /// <param name="from">Начало периода.</param>
+    /// <param name="to">Конец периода.</param>
+    /// <param name="limit">Сколько строк вернуть; null — на усмотрение API.</param>
+    /// <param name="offset">С какой строки начинать, считая с нуля.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>Список отчётов.</returns>
+    /// <exception cref="ExolveValidationException">Если <paramref name="from"/> позже <paramref name="to"/>.</exception>
+    public Task<HlrReportList> ListReportsAsync(
+        DateTimeOffset from,
+        DateTimeOffset to,
+        ulong? limit = null,
+        ulong? offset = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Exolve отвечает на это «date_from later than date_to» — проверить дешевле у себя.
+        if (from > to)
+        {
+            throw new ExolveValidationException("from must not be later than to.");
+        }
+
+        return PostAsync<HlrReportList>(
+            "GetHLRListReport", new ReportListRequest(from, to, limit, offset), cancellationToken);
+    }
+
     private async Task<TResponse> SendAsync<TResponse>(
         string method, string number, CancellationToken cancellationToken)
         where TResponse : ExolveResponse
     {
         var normalized = ExolveNumbers.Normalize(number);
+        return await PostAsync<TResponse>(method, new NumberRequest(normalized), cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<TResponse> PostAsync<TResponse>(
+        string method, object requestBody, CancellationToken cancellationToken)
+        where TResponse : ExolveResponse
+    {
         var path = $"hlr/{options.HlrApiVersion}/{method}";
         var endpoint = new Uri(options.ResolveBaseAddress(), path);
         HttpResponseMessage response;
@@ -119,7 +230,7 @@ public sealed class ExolveHlrClient
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
             request.Headers.UserAgent.ParseAdd(UserAgent);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            request.Content = JsonContent.Create(new NumberRequest(normalized), options: JsonOptions);
+            request.Content = JsonContent.Create(requestBody, requestBody.GetType(), options: JsonOptions);
 
             response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
@@ -251,5 +362,15 @@ public sealed class ExolveHlrClient
         return $"ExolveNet/{version}";
     }
 
-    private sealed record NumberRequest(string Number);
+    private sealed record NumberRequest([property: JsonPropertyName("number")] string Number);
+
+    private sealed record NumbersRequest([property: JsonPropertyName("numbers")] string Numbers);
+
+    private sealed record FileUuidRequest([property: JsonPropertyName("file_uuid")] string FileUuid);
+
+    private sealed record ReportListRequest(
+        [property: JsonPropertyName("date_from")] DateTimeOffset DateFrom,
+        [property: JsonPropertyName("date_to")] DateTimeOffset DateTo,
+        [property: JsonPropertyName("limit"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ulong? Limit,
+        [property: JsonPropertyName("offset"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ulong? Offset);
 }

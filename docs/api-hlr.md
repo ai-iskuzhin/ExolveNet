@@ -77,11 +77,67 @@ Tele2 `20`, Билайн `99`.
 
 **Только номера МТС** — в документации с оговоркой «пока».
 
-## Пакетные методы — не реализованы в SDK
+## Пакетные методы — до 50 000 номеров
 
-До 50 000 номеров за отчёт: `GenerateActivityScoreReport`, `GenerateBestCallTimeReport`
-(возвращают id отчёта), `GetHLRReport`, `GetHLRListReport`. Полей в открытой документации не
-нашлось — добавлять по догадке в SDK нельзя.
+### `POST hlr/v1/GenerateActivityScoreReport` и `POST hlr/v1/GenerateBestCallTimeReport`
+
+| Поле запроса | Тип | Значение |
+| --- | --- | --- |
+| `numbers` | string | список номеров **файлом в base64**, номер в формате `7XXXXXXXXXX` |
+
+| Поле ответа | Тип | Значение |
+| --- | --- | --- |
+| `file_uuid` | string | идентификатор отчёта для `GetHLRReport` |
+
+Не массив JSON, а именно файл в base64 — внутренний формат файла документация не описывает. SDK
+разделяет номера переводом строки; если выяснится, что Exolve ждёт другое, есть перегрузка
+`GenerateReportAsync`, принимающая готовый base64.
+
+Ошибки: `400 at least one number is required`, `400 invalid …Numbers: value length must be at
+least 1 bytes`. По отчёту активности заявлены номера **любых операторов РФ**.
+
+### `POST hlr/v1/GetHLRReport`
+
+Запрос — `file_uuid`.
+
+| Поле ответа | Тип | Значение |
+| --- | --- | --- |
+| `file_uuid` | string | идентификатор отчёта |
+| `created_at` | timestamp | **срок хранения** — 30 дней с создания, а не время создания |
+| `type` | enum | 1 — activity_score, 2 — best_call_time |
+| `status` | enum | см. ниже |
+| `number_total` | int32 | сколько номеров в отчёте |
+| `base64` | string | результаты проверки |
+
+| Статус | Значение |
+| --- | --- |
+| 1 | ожидает проверки |
+| 2 | проверка идёт |
+| 3 | отчёт готов |
+| 4 | готов, но есть ошибки |
+| 5 | срок хранения истёк |
+
+**Название `created_at` обманчивое** — по документации это дедлайн хранения. В SDK поле
+называется `RetainedUntil`.
+
+### `POST hlr/v1/GetHLRListReport`
+
+| Поле запроса | Тип | Обяз. |
+| --- | --- | --- |
+| `date_from` | timestamp (RFC-3339) | да |
+| `date_to` | timestamp (RFC-3339) | да |
+| `limit` | uint64 | нет |
+| `offset` | uint64 | нет, с нуля |
+
+Ответ — `reports`: массив объектов той же формы, что у `GetHLRReport`.
+
+Ошибки: `invalid …DateFrom: value is required`, `invalid …DateTo: value is required`,
+`date_from later than date_to`.
+
+**Расхождение в типах.** У `GetHLRReport` поле `status` документировано числом, у
+`GetHLRListReport` — строкой, при одинаковых значениях 1…5. SDK разбирает оба варианта, а
+неизвестное значение превращает в `Unknown`, а не в исключение: новый статус у поставщика не
+повод уронить разбор отчёта.
 
 ## Ошибки
 

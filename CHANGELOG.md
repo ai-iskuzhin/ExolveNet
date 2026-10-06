@@ -28,10 +28,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is only retained when `CaptureRawResponseBody` is set.
 - Multi-targeting for `netstandard2.0`, `net8.0` and `net10.0`.
 
+- The four batch report methods, up to 50 000 numbers per report:
+  `GenerateActivityScoreReportAsync`, `GenerateBestCallTimeReportAsync`, `GetReportAsync`,
+  `ListReportsAsync`. The number list goes over the wire as a **base64 file** rather than a JSON
+  array — the SDK normalizes each number and encodes the list, and refuses an empty list, a list
+  over the limit, or a single bad number locally, *before* a billable request. `GenerateReportAsync`
+  takes a prepared base64 payload for the case where Exolve's undocumented file format turns out
+  not to be newline-separated.
+- `HlrReportStatus` / `HlrReportType` parse whether the field arrives as a number
+  (`GetHLRReport`) or a string (`GetHLRListReport`) — the two endpoints document it differently
+  for the same values — and an unrecognised value becomes `Unknown` instead of failing the parse.
+- `HlrReport.RetainedUntil` renames the wire's `created_at`, which is documented as the 30-day
+  **retention deadline**, not a creation time.
+- Package icon.
+
 ### Not included yet
 
-- The batch report methods (`GenerateActivityScoreReport`, `GenerateBestCallTimeReport`,
-  `GetHLRReport`, `GetHLRListReport`) — up to 50 000 numbers per report.
 - PassCall and FlashCall (authorization by voice / by call). Their specification lives on
   `wiki.exolve.ru`, which serves a navigation shell rather than the API reference, so the field
   names could not be verified — and guessing them in an SDK is worse than omitting them.

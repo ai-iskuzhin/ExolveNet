@@ -10,7 +10,7 @@ namespace ExolveNet.Hlr;
 /// Применение по документации: вычистить неактивные номера из базы перед рассылкой или обзвоном.
 /// Владение номером это не доказывает, поэтому к подтверждению номера метод отношения не имеет.
 /// </remarks>
-public sealed record ActivityScoreResult : ExolveResponse
+public sealed record ActivityScoreResult : ExolveNumberResponse
 {
     /// <summary>
     /// Оценка от <c>"0"</c> до <c>"1"</c> строкой, как её отдаёт API.
@@ -45,7 +45,7 @@ public sealed record ActivityScoreResult : ExolveResponse
 /// <b>Только номера МТС.</b> По чужому номеру Exolve отвечает <c>400 enter another number</c>,
 /// что в SDK видно как <see cref="ExolveApiException.IsNonMtsNumber"/>.
 /// </remarks>
-public sealed record SimStatusResult : ExolveResponse
+public sealed record SimStatusResult : ExolveNumberResponse
 {
     /// <summary>
     /// <see langword="true"/>, если SIM регистрировалась в сети за последние 24 часа.
@@ -62,7 +62,7 @@ public sealed record SimStatusResult : ExolveResponse
 /// номер мог быть перенесён (<see cref="IsPorted"/>) — тогда «мтс-овский» префикс принадлежит
 /// другому оператору и наоборот.
 /// </remarks>
-public sealed record BaseNumberInfoResult : ExolveResponse
+public sealed record BaseNumberInfoResult : ExolveNumberResponse
 {
     /// <summary>Идентификатор оператора, обслуживающего номер.</summary>
     [JsonPropertyName("owner_id")]
@@ -93,7 +93,7 @@ public sealed record BaseNumberInfoResult : ExolveResponse
 /// <summary>
 /// Сколько дней прошло с последней активности в сети — <c>GetLastDateActivity</c>.
 /// </summary>
-public sealed record LastActivityResult : ExolveResponse
+public sealed record LastActivityResult : ExolveNumberResponse
 {
     /// <summary>Число дней строкой, как его отдаёт API.</summary>
     [JsonPropertyName("days_since_last_activity")]
@@ -111,7 +111,7 @@ public sealed record LastActivityResult : ExolveResponse
 /// <b>Только номера МТС</b> (в документации — «пока»). Интервал приходит в UTC+0 строкой вида
 /// <c>17:00:00,21:00:00</c>; разобранные границы — в <see cref="From"/> и <see cref="To"/>.
 /// </remarks>
-public sealed record BestTimeResult : ExolveResponse
+public sealed record BestTimeResult : ExolveNumberResponse
 {
     /// <summary>Интервал строкой, как его отдаёт API, например <c>17:00:00,21:00:00</c> (UTC+0).</summary>
     [JsonPropertyName("result")]

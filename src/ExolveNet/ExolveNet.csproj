@@ -6,10 +6,15 @@
     <Description>Unofficial .NET SDK for the MTS Exolve platform. Covers the Number Lookup (HLR) API: activity score, SIM status, operator/region lookup, last activity and best contact time.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon Condition="Exists('../../assets/ExolveNet.png')">ExolveNet.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('../../assets/ExolveNet.png')">
+    <None Include="../../assets/ExolveNet.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 
   <!-- Polyfills for records / init / required on older targets. -->
