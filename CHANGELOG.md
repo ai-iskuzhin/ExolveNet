@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the same values — and an unrecognised value becomes `Unknown` instead of failing the parse.
 - `HlrReport.RetainedUntil` renames the wire's `created_at`, which is documented as the 30-day
   **retention deadline**, not a creation time.
+- `MobileOperator` enum with `BaseNumberInfoResult.Operator` and `ActivityScoreResult.Operator`,
+  resolved from the network code (MNC) and falling back to the `owner_id` text. The table covers
+  the four federal operators only — anything else resolves to `Other`, because naming an operator
+  we are not sure of is worse than saying it is not one of those four. This is the field that
+  answers "may this number go to an MTS-only method", which a prefix table cannot: a ported number
+  (`mnp`) carries the wrong prefix.
 - Package icon.
 
 ### Not included yet

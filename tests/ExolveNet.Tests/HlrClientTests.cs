@@ -86,6 +86,8 @@ public sealed class HlrClientTests
         Assert.Equal(0.85, result.Score);
         Assert.Equal("MTS", result.OwnerId);
         Assert.Equal(54u, result.RegionCode);
+        // No network_code on this method, so the operator comes from the name.
+        Assert.Equal(MobileOperator.Mts, result.Operator);
     }
 
     [Fact]
@@ -121,6 +123,7 @@ public sealed class HlrClientTests
         Assert.Equal("20", result.Mnc);    // Tele2
         // Ported numbers are exactly why a prefix table cannot answer "which operator".
         Assert.True(result.IsPorted);
+        Assert.Equal(MobileOperator.Tele2, result.Operator);
     }
 
     [Fact]

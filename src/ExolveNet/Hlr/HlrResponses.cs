@@ -31,6 +31,15 @@ public sealed record ActivityScoreResult : ExolveNumberResponse
     public uint? RegionCode { get; init; }
 
     /// <summary>
+    /// Оператор, определённый по <see cref="OwnerId"/>.
+    /// </summary>
+    /// <remarks>
+    /// Кода сети этот метод не возвращает, поэтому определение идёт по названию — оно менее
+    /// надёжно. Там, где оператор важен, лучше спрашивать <c>GetBaseNumberInfo</c>.
+    /// </remarks>
+    public MobileOperator Operator => ExolveOperators.Resolve(mnc: null, OwnerId);
+
+    /// <summary>
     /// <see cref="Result"/> числом: 0 — минимальная активность, 1 — максимальная; null, если
     /// значение не разобралось.
     /// </summary>
@@ -88,6 +97,16 @@ public sealed record BaseNumberInfoResult : ExolveNumberResponse
 
     /// <summary>Код оператора из <see cref="NetworkCode"/>, или null, если его нет.</summary>
     public string? Mnc => NetworkCode is { Length: >= 5 } c ? c.Substring(3, 2) : null;
+
+    /// <summary>
+    /// Оператор, определённый по <see cref="Mnc"/>, а при его отсутствии — по
+    /// <see cref="OwnerId"/>.
+    /// </summary>
+    /// <remarks>
+    /// Именно это значение отвечает на вопрос «пускать ли номер в метод, который работает только
+    /// по МТС»: с учётом <see cref="IsPorted"/> по префиксу номера такой вывод сделать нельзя.
+    /// </remarks>
+    public MobileOperator Operator => ExolveOperators.Resolve(Mnc, OwnerId);
 }
 
 /// <summary>
