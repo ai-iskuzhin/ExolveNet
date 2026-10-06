@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+# Least privilege: CI only reads the repo. Publishing lives in its own workflows, which ask for
+# exactly the extra scopes they need.
+permissions:
+  contents: read
+
+# A new push to the same branch or PR makes the in-flight run obsolete — cancel it instead of
+# paying for both. Tags are never cancelled: a release run must finish.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Build, test, pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # No packages.lock.json in this repo, so the cache is keyed on the files that decide what
+      # gets restored.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore ExolveNet.slnx
+
+      - name: Build
+        run: dotnet build ExolveNet.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test ExolveNet.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Pack
+        run: dotnet pack ExolveNet.slnx --configuration Release --no-build --output artifacts/packages
+
+      - name: Upload Packages
+        uses: actions/upload-artifact@v5
+        with:
+          name: packages
+          path: artifacts/packages/*

@@ -1,0 +1,98 @@
+name: Deployment
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write        # required for NuGet Trusted Publishing (OIDC)
+
+jobs:
+  github-release:
+    name: Create GitHub Release And Publish NuGet
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # A tag says v0.2.0 while Directory.Build.props still says 0.1.0 and the release quietly
+      # ships the old version under the new name. Catch it before anything is published —
+      # NuGet.org has no undo.
+      - name: Verify the tag matches the package version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          props_version=$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' Directory.Build.props | head -1)
+          tag_version="${TAG_NAME#v}"
+          if [ -z "$props_version" ]; then
+            echo "::error::Could not read <Version> from Directory.Build.props."
+            exit 1
+          fi
+          if [ "$props_version" != "$tag_version" ]; then
+            echo "::error::Tag $TAG_NAME implies version '$tag_version' but Directory.Build.props says '$props_version'. Set <Version>$tag_version</Version>, commit, move the tag, and re-push — or tag v$props_version instead."
+            exit 1
+          fi
+          echo "Version $props_version matches tag $TAG_NAME."
+
+      - name: Restore
+        run: dotnet restore ExolveNet.slnx
+
+      - name: Build
+        run: dotnet build ExolveNet.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test ExolveNet.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Pack Packages
+        run: dotnet pack ExolveNet.slnx --configuration Release --no-build --output artifacts/packages
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          args=(
+            artifacts/packages/*
+            --title "ExolveNet ${TAG_NAME#v}"
+            --generate-notes
+            --verify-tag
+          )
+
+          if [[ "$TAG_NAME" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+
+          gh release create "$TAG_NAME" "${args[@]}"
+
+      # NuGet Trusted Publishing: exchanges the GitHub OIDC token for a short-lived
+      # NuGet.org API key. Requires a trusted publishing policy configured on NuGet.org
+      # and the NUGET_USER repository variable set to the owning account.
+      - name: NuGet Trusted Publishing Login
+        if: vars.NUGET_USER != ''
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish NuGet Packages
+        if: vars.NUGET_USER != ''
+        run: |
+          for package in artifacts/packages/*.nupkg artifacts/packages/*.snupkg; do
+            dotnet nuget push "$package" \
+              --source https://api.nuget.org/v3/index.json \
+              --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+              --skip-duplicate
+          done
+
+      - name: Skip NuGet Publish
+        if: vars.NUGET_USER == ''
+        run: echo "::warning::NUGET_USER repository variable is not set; GitHub Release artifacts were created but packages were NOT published to NuGet.org. Configure NuGet Trusted Publishing to enable it."

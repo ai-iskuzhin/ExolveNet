@@ -1,0 +1,76 @@
+name: Publish NuGet
+
+# Manual escape hatch for publishing a version without tagging — a preview from a branch, or a
+# re-push after a failed Deployment run. The normal path is a v* tag (see deployment.yml).
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: 'Git ref to publish from, for example v0.1.0-preview.1'
+        required: true
+        type: string
+      version:
+        description: 'Package version to publish, for example 0.1.0-preview.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write        # required for NuGet Trusted Publishing (OIDC)
+
+jobs:
+  publish:
+    name: Publish NuGet Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ExolveNet.slnx
+
+      - name: Build
+        run: dotnet build ExolveNet.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test ExolveNet.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Pack Requested Version
+        run: >
+          dotnet pack src/ExolveNet/ExolveNet.csproj
+          --configuration Release
+          --no-build
+          --output artifacts/packages
+          -p:PackageVersion=${{ inputs.version }}
+          -p:Version=${{ inputs.version }}
+          -p:InformationalVersion=${{ inputs.version }}
+
+      # NuGet Trusted Publishing (OIDC): mint a short-lived API key from the GitHub token.
+      # Requires a trusted publishing policy on NuGet.org and the NUGET_USER repository variable.
+      - name: NuGet Trusted Publishing Login
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish Package
+        run: >
+          dotnet nuget push artifacts/packages/ExolveNet.${{ inputs.version }}.nupkg
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          --skip-duplicate
+
+      - name: Publish Symbols
+        run: >
+          dotnet nuget push artifacts/packages/ExolveNet.${{ inputs.version }}.snupkg
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          --skip-duplicate
