@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/ExolveNet/ExolveNet.csproj" />
+  <Project Path="tests/ExolveNet.Tests/ExolveNet.Tests.csproj" />
+</Solution>
