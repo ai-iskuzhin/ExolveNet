@@ -5,24 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - 2026-10-07
+## [0.2.0] - 2026-10-07
+
+Two bugs that every unit test in 0.1.0 passed over, because the tests encoded the vendor's
+documentation rather than the wire. Both were found by running the SDK against `api.exolve.ru`.
 
 ### Fixed
 
-- Parse the error shape the live API actually returns. Exolve answers with a nested object,
-  `{"error":{"message":"…"}}`, while the documentation shows a flat `{"error":"…"}`. Only the flat
-  form was modelled, so `ExolveError.Text` was always null and `IsNonMtsNumber`, `IsHlrDisabled`
-  and `IsUnsignedCustomer` never fired — the SDK's whole point of not making callers match on
-  error strings. Both shapes now parse, verified against `api.exolve.ru`.
-- `MobileOperator.Yota` (MNC 11) and `MobileOperator.TinkoffMobile` (MNC 62), both verified
-  against the live API.
-- Parse `network_code` as the live API sends it. Exolve returns `RU25002` — ISO country letters,
-  then MCC, then MNC — while the docs describe five bare digits. Splitting by the documented
-  positions produced `RU2` / `50` and resolved MegaFon as `Other`, so `GetBaseNumberInfo` and
-  `GetActivityScore` disagreed about the operator of the same number. Digits are now extracted
-  before splitting, and the country letters are exposed as `Country`.
-- `ExolveApiException.RawBody` keeps the response body. Discarding it is what hid the above: the
-  body was parsed, found wanting and thrown away, leaving an empty `Error` and no way to see why.
+- **The error body is a nested object, not a string.** Exolve answers
+  `{"error":{"message":"…"}}`; the documentation shows a flat `{"error":"…"}`. Only the flat form
+  was modelled, so `ExolveError.Text` was always null — and with it `IsNonMtsNumber`,
+  `IsHlrDisabled` and `IsUnsignedCustomer` never fired. Those flags exist so callers never match
+  on error strings, and against the real service all three were dead. Both shapes now parse, plus
+  a top-level `message`.
+- **`network_code` is `RU25002`, not five bare digits.** ISO country letters, then MCC, then MNC.
+  Splitting by the documented positions yielded `RU2` / `50`, so a MegaFon number resolved as
+  `Other` and `GetBaseNumberInfo` disagreed with `GetActivityScore` about the operator of the same
+  number. Digits are extracted before splitting, so both the real and the documented form work.
+
+### Added
+
+- `ExolveApiException.RawBody` — the response body, kept. Discarding it is what hid the error-shape
+  bug: the body was parsed, found wanting and thrown away, leaving an empty `Error` and no way to
+  tell the flags had simply not matched.
+- `BaseNumberInfoResult.Country` — the ISO letters from `network_code`.
+- `MobileOperator.Yota` (MNC 11) and `MobileOperator.TinkoffMobile` (MNC 62), verified against the
+  live API. Note that T-Mobile is an MVNO on MTS's network and is still refused by `GetSimStatus`,
+  so the vendor's "is this MTS" test goes by operator of record, not by host network.
+
+### Changed
+
+- Documentation no longer carries detail specific to one consumer of the SDK.
+
+### Confirmed against the live API
+
+- `GetActivityScore` and `GetBaseNumberInfo` answer for **any** Russian operator; only
+  `GetSimStatus` is MTS-only. The restriction is per method, not per platform.
+- Only `200` responses are billed. Rejections — wrong operator, service disabled, malformed
+  number — are not. (The "no data for this number" case is still untested.)
 
 ## [0.1.0] - 2026-10-06
 
