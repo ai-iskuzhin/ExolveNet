@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   form was modelled, so `ExolveError.Text` was always null and `IsNonMtsNumber`, `IsHlrDisabled`
   and `IsUnsignedCustomer` never fired — the SDK's whole point of not making callers match on
   error strings. Both shapes now parse, verified against `api.exolve.ru`.
+- Parse `network_code` as the live API sends it. Exolve returns `RU25002` — ISO country letters,
+  then MCC, then MNC — while the docs describe five bare digits. Splitting by the documented
+  positions produced `RU2` / `50` and resolved MegaFon as `Other`, so `GetBaseNumberInfo` and
+  `GetActivityScore` disagreed about the operator of the same number. Digits are now extracted
+  before splitting, and the country letters are exposed as `Country`.
 - `ExolveApiException.RawBody` keeps the response body. Discarding it is what hid the above: the
   body was parsed, found wanting and thrown away, leaving an empty `Error` and no way to see why.
 

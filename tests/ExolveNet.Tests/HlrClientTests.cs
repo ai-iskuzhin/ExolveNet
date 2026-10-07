@@ -111,16 +111,33 @@ public sealed class HlrClientTests
     }
 
     [Fact]
-    public async Task Reads_base_number_info_and_splits_the_network_code()
+    public async Task Reads_base_number_info_and_splits_the_real_network_code_format()
     {
+        // Verified against api.exolve.ru: network_code is "RU25002" — ISO country letters, then
+        // MCC, then MNC. The docs describe it as "three digits MCC + two digits MNC", and parsing
+        // by those positions yields "RU2" and "50", which resolves to the wrong operator entirely.
+        var handler = Ok("""{"number":79139999999,"owner_id":"mMEGAFON","region_code":2,"network_code":"RU25002","mnp":false}""");
+
+        var result = await Client(handler).GetBaseNumberInfoAsync("79139999999");
+
+        Assert.Equal("RU25002", result.NetworkCode);
+        Assert.Equal("RU", result.Country);
+        Assert.Equal("250", result.Mcc);
+        Assert.Equal("02", result.Mnc);
+        Assert.Equal(MobileOperator.Megafon, result.Operator);
+    }
+
+    [Fact]
+    public async Task Still_splits_the_network_code_the_docs_describe()
+    {
+        // The documented bare-digits form must keep working if Exolve ever sends it.
         var handler = Ok("""{"number":79139999999,"owner_id":"Tele2","region_code":54,"network_code":"25020","mnp":true}""");
 
         var result = await Client(handler).GetBaseNumberInfoAsync("79139999999");
 
-        Assert.Equal("Tele2", result.OwnerId);
-        Assert.Equal("25020", result.NetworkCode);
-        Assert.Equal("250", result.Mcc);   // Russia
-        Assert.Equal("20", result.Mnc);    // Tele2
+        Assert.Null(result.Country);
+        Assert.Equal("250", result.Mcc);
+        Assert.Equal("20", result.Mnc);
         // Ported numbers are exactly why a prefix table cannot answer "which operator".
         Assert.True(result.IsPorted);
         Assert.Equal(MobileOperator.Tele2, result.Operator);

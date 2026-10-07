@@ -82,9 +82,14 @@ public sealed record BaseNumberInfoResult : ExolveNumberResponse
     public uint? RegionCode { get; init; }
 
     /// <summary>
-    /// Код сети: три цифры кода страны (MCC) плюс две цифры кода оператора (MNC).
+    /// Код сети, как его отдаёт API, — например <c>RU25002</c>.
     /// </summary>
-    /// <remarks>Для России MCC — <c>250</c>; см. <see cref="Mcc"/> и <see cref="Mnc"/>.</remarks>
+    /// <remarks>
+    /// Документация описывает его как «три цифры кода страны (MCC) плюс две цифры кода оператора
+    /// (MNC)», но на деле перед цифрами идут ещё буквы страны: <c>RU</c> + <c>250</c> + <c>02</c>.
+    /// Разбирать по позициям, как написано в документации, нельзя — получится <c>RU2</c> и
+    /// <c>50</c>. Готовые части — в <see cref="Country"/>, <see cref="Mcc"/> и <see cref="Mnc"/>.
+    /// </remarks>
     [JsonPropertyName("network_code")]
     public string? NetworkCode { get; init; }
 
@@ -92,11 +97,29 @@ public sealed record BaseNumberInfoResult : ExolveNumberResponse
     [JsonPropertyName("mnp")]
     public bool IsPorted { get; init; }
 
-    /// <summary>Код страны из <see cref="NetworkCode"/>, или null, если его нет.</summary>
-    public string? Mcc => NetworkCode is { Length: >= 3 } c ? c.Substring(0, 3) : null;
+    /// <summary>Буквенный код страны из <see cref="NetworkCode"/> (<c>RU</c>), или null.</summary>
+    public string? Country
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(NetworkCode)) return null;
+            var letters = new string(NetworkCode!.TakeWhile(char.IsLetter).ToArray());
+            return letters.Length > 0 ? letters : null;
+        }
+    }
 
-    /// <summary>Код оператора из <see cref="NetworkCode"/>, или null, если его нет.</summary>
-    public string? Mnc => NetworkCode is { Length: >= 5 } c ? c.Substring(3, 2) : null;
+    /// <summary>Код страны MCC из <see cref="NetworkCode"/> (<c>250</c> для России), или null.</summary>
+    public string? Mcc => Digits is { Length: >= 3 } d ? d.Substring(0, 3) : null;
+
+    /// <summary>Код оператора MNC из <see cref="NetworkCode"/>, или null.</summary>
+    public string? Mnc => Digits is { Length: >= 5 } d ? d.Substring(3, 2) : null;
+
+    /// <summary>
+    /// Только цифры из <see cref="NetworkCode"/> — чтобы разбор не зависел от того, есть ли перед
+    /// ними буквы страны.
+    /// </summary>
+    private string? Digits =>
+        NetworkCode is null ? null : new string(NetworkCode.Where(char.IsDigit).ToArray());
 
     /// <summary>
     /// Оператор, определённый по <see cref="Mnc"/>, а при его отсутствии — по
