@@ -280,7 +280,8 @@ public sealed class ExolveHlrClient
         return new ExolveApiException(
             $"Exolve POST {path} returned HTTP {status} ({response.StatusCode}).{detail}",
             response.StatusCode,
-            error);
+            error,
+            body);
     }
 
     private static TResponse Deserialize<TResponse>(string path, HttpResponseMessage response, string body)

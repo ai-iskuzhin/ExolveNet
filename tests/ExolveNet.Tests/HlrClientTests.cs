@@ -178,6 +178,48 @@ public sealed class HlrClientTests
     }
 
     [Fact]
+    public async Task Parses_the_nested_error_shape_the_live_api_actually_returns()
+    {
+        // Verified against api.exolve.ru: the body is {"error":{"message":"…"}}, an object — the
+        // flat {"error":"…"} in the docs is not what comes back. Modelling only the flat form left
+        // Error.Text permanently null, which silently disabled every flag below.
+        var handler = new StubHttpMessageHandler(
+            HttpStatusCode.BadRequest, """{"error":{"message":"hlr is disabled on the application"}}""");
+
+        var ex = await Assert.ThrowsAsync<ExolveApiException>(
+            () => Client(handler).GetActivityScoreAsync("79139999999"));
+
+        Assert.Equal("hlr is disabled on the application", ex.Error!.Text);
+        Assert.True(ex.IsHlrDisabled);
+    }
+
+    [Theory]
+    [InlineData("""{"error":{"message":"enter another number"}}""")]
+    [InlineData("""{"error":"enter another number"}""")]
+    [InlineData("""{"message":"enter another number"}""")]
+    public async Task The_flags_work_whichever_error_shape_arrives(string body)
+    {
+        var ex = await Assert.ThrowsAsync<ExolveApiException>(
+            () => Client(new StubHttpMessageHandler(HttpStatusCode.BadRequest, body)).GetSimStatusAsync("79139999999"));
+
+        Assert.True(ex.IsNonMtsNumber);
+    }
+
+    [Fact]
+    public async Task The_raw_error_body_is_kept_so_an_unmodelled_shape_stays_visible()
+    {
+        // The reason the nested shape went unnoticed: the body was parsed, found wanting, and
+        // thrown away, leaving an empty Error and no way to see why.
+        const string body = """{"unexpected":{"nested":"shape"}}""";
+        var handler = new StubHttpMessageHandler(HttpStatusCode.BadRequest, body);
+
+        var ex = await Assert.ThrowsAsync<ExolveApiException>(
+            () => Client(handler).GetActivityScoreAsync("79139999999"));
+
+        Assert.Equal(body, ex.RawBody);
+    }
+
+    [Fact]
     public async Task Hlr_disabled_on_the_application_is_its_own_signal()
     {
         var handler = new StubHttpMessageHandler(

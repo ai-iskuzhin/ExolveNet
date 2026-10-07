@@ -50,11 +50,14 @@ public sealed class ExolveApiException : ExolveException
     /// <param name="message">Сообщение.</param>
     /// <param name="statusCode">Код ответа.</param>
     /// <param name="error">Разобранное тело ошибки, если удалось.</param>
-    public ExolveApiException(string message, HttpStatusCode statusCode, ExolveError? error)
+    /// <param name="rawBody">Тело ответа как пришло.</param>
+    public ExolveApiException(
+        string message, HttpStatusCode statusCode, ExolveError? error, string? rawBody = null)
         : base(message)
     {
         HttpStatusCode = statusCode;
         Error = error;
+        RawBody = rawBody;
     }
 
     /// <summary>Код ответа.</summary>
@@ -62,6 +65,16 @@ public sealed class ExolveApiException : ExolveException
 
     /// <summary>Тело ошибки, если его удалось разобрать.</summary>
     public ExolveError? Error { get; }
+
+    /// <summary>
+    /// Тело ответа как пришло — чтобы форма ошибки, которую модель не знает, оставалась видимой.
+    /// </summary>
+    /// <remarks>
+    /// Именно отсутствие этого поля скрыло реальную форму ошибки: <see cref="Error"/> молча
+    /// оказывался пустым, и по признакам вроде <see cref="IsHlrDisabled"/> нельзя было понять, что
+    /// они просто не сработали. Номера телефона в теле ошибки нет, поэтому сохраняется целиком.
+    /// </remarks>
+    public string? RawBody { get; }
 
     /// <summary>
     /// Номер не принадлежит МТС, а метод работает только по номерам МТС
