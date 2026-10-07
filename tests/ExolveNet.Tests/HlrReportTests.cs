@@ -29,10 +29,12 @@ public sealed class HlrReportTests
         Assert.Equal("https://api.exolve.ru/hlr/v1/GenerateActivityScoreReport",
             handler.LastRequest!.RequestUri!.AbsoluteUri);
 
-        // The wire field is a base64 *file*, and each number is normalized on the way in.
+        // The wire field is a base64 *file*, each number normalized on the way in — and the file
+        // opens with a header line, because Exolve parses it as CSV and skips the first row. Sent
+        // without one, the first number is silently dropped from the report.
         var sent = System.Text.Json.JsonDocument.Parse(handler.LastRequestBody!)
             .RootElement.GetProperty("numbers").GetString()!;
-        Assert.Equal("79139999999\n79139999998", Decode(sent));
+        Assert.Equal("Number\n79139999999\n79139999998", Decode(sent));
     }
 
     [Fact]

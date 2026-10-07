@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-10-07
+
+A third bug of the same family as 0.2.0 — the undocumented part of the wire, found by sending a
+two-number report and getting one number back.
+
+### Fixed
+
+- **The batch file needs a header line; without it the first number is silently dropped.** Exolve
+  parses the base64 file as CSV and skips the first row. `EncodeNumberList` joined the numbers with
+  a newline and nothing else, so the first number of every list went in as the header and was never
+  checked: the report came back `Ready`, just one number short, with `number_total` one below what
+  was sent. A list of a single number was rejected outright with «at least one number is required»
+  — its only line had become the header. The file now opens with a `Number` row.
+
+  The vendor documents the field as «формат файла — base64, формат номера — 7ХХХХХХХХХХ» and says
+  nothing about a header, so the previous form was a reasonable reading. It was also untested: no
+  unit test covered `EncodeNumberList` at all, which is why 73 green tests said nothing about it.
+  Covered now, including the single-number case.
+
+### Note for callers
+
+`number_total` in a report is **how many numbers Exolve parsed, not how many it answered.** A row
+that came back `No information on this number` is counted in it. Anyone billing per answer should
+count the rows whose `Result` is non-empty instead.
+
 ## [0.2.0] - 2026-10-07
 
 Two bugs that every unit test in 0.1.0 passed over, because the tests encoded the vendor's

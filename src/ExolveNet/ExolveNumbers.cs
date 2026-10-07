@@ -56,17 +56,27 @@ public static class ExolveNumbers
     /// <summary>Предел пакетного отчёта — 50 000 номеров за запрос.</summary>
     public const int MaxBatchSize = 50_000;
 
+    /// <summary>Заголовок файла пакетного отчёта. Exolve пропускает первую строку.</summary>
+    /// <remarks>
+    /// Значение роли не играет — важно, что строка есть. Exolve разбирает файл как CSV и первую
+    /// строку считает заголовком, поэтому без неё первый номер списка молча теряется.
+    /// </remarks>
+    private const string BatchHeader = "Number";
+
     /// <summary>
     /// Готовит список номеров для пакетных методов: нормализует каждый и кодирует в base64.
     /// </summary>
     /// <remarks>
     /// Пакетные методы принимают не массив JSON, а <b>файл в base64</b> — в документации
-    /// «формат файла — base64, формат номера — 7ХХХХХХХХХХ». Сам формат файла не описан; здесь
-    /// номера разделяются переводом строки, как принято для таких списков. Если Exolve ждёт
-    /// другое, есть перегрузка, принимающая готовый base64.
+    /// «формат файла — base64, формат номера — 7ХХХХХХХХХХ». Сам формат файла не описан, и
+    /// выяснялся он опытом: <b>первая строка файла считается заголовком и в обработку не идёт</b>.
+    /// Список без заголовка Exolve принимает молча и теряет первый номер (<c>number_total</c>
+    /// на единицу меньше отправленного), а список из одного номера отвергает с
+    /// «at least one number is required» — единственная строка уходит в заголовок. Поэтому
+    /// строка <c>Number</c> добавляется здесь, а номера разделяются переводом строки.
     /// </remarks>
     /// <param name="numbers">Номера в любом привычном виде.</param>
-    /// <returns>Base64 списка номеров, по одному в строке.</returns>
+    /// <returns>Base64 файла: строка заголовка, затем номера по одному в строке.</returns>
     /// <exception cref="ExolveValidationException">
     /// Если список пуст, или в нём больше <see cref="MaxBatchSize"/> номеров, или какой-то номер
     /// не приводится к российскому.
@@ -95,6 +105,7 @@ public static class ExolveNumbers
             throw new ExolveValidationException("numbers must contain at least one entry.");
         }
 
+        normalized.Insert(0, BatchHeader);
         var text = string.Join("\n", normalized);
         return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(text));
     }
