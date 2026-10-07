@@ -12,11 +12,18 @@ public sealed class OperatorTests
     public void Resolves_the_four_federal_operators_from_their_network_code(string mnc, MobileOperator expected) =>
         Assert.Equal(expected, ExolveOperators.Resolve(mnc));
 
+    [Theory]
+    [InlineData("11", MobileOperator.Yota)]
+    [InlineData("62", MobileOperator.TinkoffMobile)]
+    public void Resolves_the_two_mvnos_confirmed_against_the_live_api(string mnc, MobileOperator expected) =>
+        // Checked against our own numbers: the MNC matched the carrier recorded for those SIMs.
+        Assert.Equal(expected, ExolveOperators.Resolve(mnc));
+
     [Fact]
-    public void A_valid_code_outside_the_four_is_Other_not_Unknown()
+    public void A_valid_but_unmapped_code_is_Other_not_Unknown()
     {
         // We know who it isn't; claiming a name we are not sure of would be worse.
-        Assert.Equal(MobileOperator.Other, ExolveOperators.Resolve("11"));
+        Assert.Equal(MobileOperator.Other, ExolveOperators.Resolve("35"));
     }
 
     [Fact]

@@ -18,6 +18,12 @@ public enum MobileOperator
     /// <summary>Tele2.</summary>
     Tele2 = 4,
 
+    /// <summary>Yota — MVNO на сети МегаФона.</summary>
+    Yota = 5,
+
+    /// <summary>Т-Мобайл (Тинькофф Мобайл) — MVNO на сети МТС.</summary>
+    TinkoffMobile = 6,
+
     /// <summary>Оператор определён, но это не один из четырёх федеральных.</summary>
     Other = 99
 }
@@ -29,9 +35,15 @@ public enum MobileOperator
 /// Код сети надёжнее названия: <c>owner_id</c> — свободная строка, которую поставщик может
 /// написать как угодно, а MNC стандартизован.
 /// <para>
-/// Таблица намеренно скупая — только четыре федеральных оператора, чьи MNC не вызывают сомнений.
-/// Для остальных возвращается <see cref="MobileOperator.Other"/>: врать точным названием там, где
-/// нет уверенности, хуже, чем честно сказать «не из этих четырёх».
+/// Таблица намеренно скупая — четыре федеральных оператора плюс два MVNO, чьи MNC подтверждены на
+/// живом API по нашим собственным номерам. Для остальных возвращается
+/// <see cref="MobileOperator.Other"/>: врать точным названием там, где нет уверенности, хуже, чем
+/// честно сказать «не из известных».
+/// <para>
+/// MVNO важны отдельно: Т-Мобайл работает на сети МТС, но Exolve всё равно считает такой номер
+/// не-мтс-овским — <c>GetSimStatus</c> отвечает на него <c>enter another number</c>. То есть
+/// проверка «это МТС» у Exolve идёт по оператору записи, а не по сети, на которой номер работает.
+/// </para>
 /// </para>
 /// </remarks>
 public static class ExolveOperators
@@ -53,6 +65,10 @@ public static class ExolveOperators
             case "02": return MobileOperator.Megafon;
             case "99": return MobileOperator.Beeline;
             case "20": return MobileOperator.Tele2;
+            // Подтверждены на живом API по нашим же номерам: MNC совпал с оператором, который
+            // записан за этими SIM у нас в gateway_sims.
+            case "11": return MobileOperator.Yota;
+            case "62": return MobileOperator.TinkoffMobile;
         }
 
         if (!string.IsNullOrWhiteSpace(mnc))
@@ -71,6 +87,8 @@ public static class ExolveOperators
         if (Has(name, "megafon") || Has(name, "мегафон")) return MobileOperator.Megafon;
         if (Has(name, "beeline") || Has(name, "билайн")) return MobileOperator.Beeline;
         if (Has(name, "tele2") || Has(name, "теле2")) return MobileOperator.Tele2;
+        if (Has(name, "yota") || Has(name, "йота")) return MobileOperator.Yota;
+        if (Has(name, "tinkoff") || Has(name, "т-мобайл") || Has(name, "тинькофф")) return MobileOperator.TinkoffMobile;
 
         return MobileOperator.Other;
     }
