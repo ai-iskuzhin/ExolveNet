@@ -16,7 +16,7 @@ public sealed class OperatorTests
     [InlineData("11", MobileOperator.Yota)]
     [InlineData("62", MobileOperator.TinkoffMobile)]
     public void Resolves_the_two_mvnos_confirmed_against_the_live_api(string mnc, MobileOperator expected) =>
-        // Checked against our own numbers: the MNC matched the carrier recorded for those SIMs.
+        // Verified against the live API.
         Assert.Equal(expected, ExolveOperators.Resolve(mnc));
 
     [Fact]

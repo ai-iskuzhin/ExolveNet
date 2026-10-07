@@ -270,7 +270,7 @@ public sealed class ExolveHlrClient
             }
             catch (JsonException)
             {
-                // Не наша схема ошибки (404 отдаёт текст) — оставляем error = null.
+                // Тело не по схеме ошибки (404 отдаёт текст) — оставляем error = null.
             }
         }
 

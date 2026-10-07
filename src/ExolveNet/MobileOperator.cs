@@ -35,8 +35,8 @@ public enum MobileOperator
 /// Код сети надёжнее названия: <c>owner_id</c> — свободная строка, которую поставщик может
 /// написать как угодно, а MNC стандартизован.
 /// <para>
-/// Таблица намеренно скупая — четыре федеральных оператора плюс два MVNO, чьи MNC подтверждены на
-/// живом API по нашим собственным номерам. Для остальных возвращается
+/// Таблица намеренно скупая — четыре федеральных оператора плюс два MVNO, чьи MNC проверены на
+/// живом API. Для остальных возвращается
 /// <see cref="MobileOperator.Other"/>: врать точным названием там, где нет уверенности, хуже, чем
 /// честно сказать «не из известных».
 /// <para>
@@ -65,8 +65,7 @@ public static class ExolveOperators
             case "02": return MobileOperator.Megafon;
             case "99": return MobileOperator.Beeline;
             case "20": return MobileOperator.Tele2;
-            // Подтверждены на живом API по нашим же номерам: MNC совпал с оператором, который
-            // записан за этими SIM у нас в gateway_sims.
+            // Проверено на живом API.
             case "11": return MobileOperator.Yota;
             case "62": return MobileOperator.TinkoffMobile;
         }
