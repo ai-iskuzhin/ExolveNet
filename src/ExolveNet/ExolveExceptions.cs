@@ -106,6 +106,24 @@ public sealed class ExolveApiException : ExolveException
     public bool IsUnsignedCustomer =>
         HttpStatusCode == HttpStatusCode.BadRequest
         && Error?.Text?.IndexOf("customer has not signed", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    /// <summary>
+    /// По номеру нет данных (<c>404 no information on this number</c>).
+    /// </summary>
+    /// <remarks>
+    /// <b>Это ответ, а не поломка.</b> Оператор отдал регистр и в нём ничего не нашлось — услуга
+    /// выполнена. В личном кабинете такие запросы считаются отдельно («не получен статус»), и у
+    /// активности их доля заметная: номер без оценки активности при этом может иметь базовую
+    /// справку, так что «нет данных» — это свойство услуги, а не номера.
+    /// <para>
+    /// Единственный известный случай, когда ответ приходит с кодом <c>404</c>, а не <c>400</c>:
+    /// отличать его важно, потому что повторять такой запрос бессмысленно — ответ не изменится,
+    /// а запрос будет выполнен снова.
+    /// </para>
+    /// </remarks>
+    public bool IsNoInformation =>
+        (HttpStatusCode == HttpStatusCode.NotFound || HttpStatusCode == HttpStatusCode.BadRequest)
+        && Error?.Text?.IndexOf("no information on this number", StringComparison.OrdinalIgnoreCase) >= 0;
 }
 
 /// <summary>Ответ пришёл, но разобрать его не удалось.</summary>

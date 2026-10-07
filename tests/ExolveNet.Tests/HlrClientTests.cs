@@ -194,6 +194,41 @@ public sealed class HlrClientTests
         Assert.False(ex.IsUnsignedCustomer);
     }
 
+    /// <summary>
+    /// «Нет данных по номеру» — ответ, а не поломка, и приходит он с кодом <c>404</c>, не
+    /// <c>400</c>. Проверено на живом API: <c>GetActivityScore</c> по номеру без оценки активности
+    /// отвечает <c>404 {"error":{"message":"no information on this number"}}</c>, тогда как
+    /// <c>GetBaseNumberInfo</c> по тому же номеру отдаёт <c>200</c> с данными.
+    /// </summary>
+    [Fact]
+    public async Task No_information_on_the_number_is_flagged_as_an_answer_not_a_fault()
+    {
+        var handler = new StubHttpMessageHandler(
+            HttpStatusCode.NotFound, """{"error":{"message":"no information on this number"}}""");
+
+        var ex = await Assert.ThrowsAsync<ExolveApiException>(
+            () => Client(handler).GetActivityScoreAsync("79139999901"));
+
+        Assert.Equal(HttpStatusCode.NotFound, ex.HttpStatusCode);
+        Assert.True(ex.IsNoInformation);
+        // Not to be confused with the operator-coverage case, which is a different outcome.
+        Assert.False(ex.IsNonMtsNumber);
+        Assert.False(ex.IsHlrDisabled);
+        Assert.False(ex.IsUnsignedCustomer);
+    }
+
+    [Fact]
+    public async Task An_unrelated_error_is_not_mistaken_for_missing_data()
+    {
+        var handler = new StubHttpMessageHandler(
+            HttpStatusCode.NotFound, """{"error":{"message":"method not found"}}""");
+
+        var ex = await Assert.ThrowsAsync<ExolveApiException>(
+            () => Client(handler).GetActivityScoreAsync("79139999901"));
+
+        Assert.False(ex.IsNoInformation);
+    }
+
     [Fact]
     public async Task Parses_the_nested_error_shape_the_live_api_actually_returns()
     {

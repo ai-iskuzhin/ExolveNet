@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-10-07
+
+### Added
+
+- **`ExolveApiException.IsNoInformation`** — «по номеру нет данных», единственный известный ответ
+  с кодом `404` вместо `400`. Это **ответ, а не поломка**: регистр опрошен, в нём ничего не
+  нашлось, услуга выполнена. Без признака такой ответ попадал в общую ветку ошибок и выглядел
+  как сбой — а вызывающий код, приняв его за сбой, повторяет запрос, который гарантированно
+  вернёт то же самое.
+
+  У активности доля таких ответов заметная, и номер без оценки активности при этом может иметь
+  базовую справку: «нет данных» — свойство услуги по этому номеру, а не самого номера.
+
 ## [0.2.1] - 2026-10-07
 
 A third bug of the same family as 0.2.0 — the undocumented part of the wire, found by sending a
